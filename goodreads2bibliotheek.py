@@ -95,7 +95,7 @@ def format_results(run_results):
     s = ''
     for row in run_results.to_dict(orient='records'):
         s += f"{row['title']} - {row['author']}\n"
-        s += f"row['link']\n"
+        s += f"{row['link']}\n"
         s += "\n"
     return s
 
