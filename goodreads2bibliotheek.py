@@ -1,3 +1,5 @@
+import pprint
+
 from bs4 import BeautifulSoup
 from fuzzywuzzy import fuzz
 import pandas as pd
@@ -74,6 +76,15 @@ def load_goodreads_data(goodreads_library_export='goodreads_library_export.csv',
 
     return df, df_filtered
 
+def print_results(run_results):
+    for row in run_results.to_dict(orient='records'):
+        print(f"{row['title']} - {row['author']}")
+        print(row['link'])
+        print()
+        
+        # alternative:
+        # pprint.pprint(row, sort_dicts=False)
+
 def run(goodreads_library_export, work_type='ebook', max_books=None):
     # load, clean and filter data
     df, df_filtered = load_goodreads_data(goodreads_library_export)
@@ -84,7 +95,11 @@ def run(goodreads_library_export, work_type='ebook', max_books=None):
 
     # scrape results
     results = df_filtered.apply(lambda row: check_availability(title=row['title_clean'], author=row['Author'], work_type=work_type), axis=1)
-    return results
+
+    # turn results into neat DataFrame
+    return pd.DataFrame([r for bookresult in results.to_list() for r in bookresult])
+
+
 
 
 # TODO: script errors on search with many hits ("Heen" by Laurens Verhagen)
