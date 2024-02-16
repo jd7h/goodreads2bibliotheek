@@ -1,3 +1,4 @@
+from urllib.parse import quote as urllib_quote # for escaping weird characters in titles and author names
 import pprint
 
 from bs4 import BeautifulSoup
@@ -6,6 +7,9 @@ import pandas as pd
 import requests
 
 SIM_THRESHOLD = 75
+
+def cleanup_whitespace(s):
+    return " ".join(s.strip().split())
 
 def parse_results(response_text, original_title, original_author):
     soup = BeautifulSoup(response_text, "html.parser")
@@ -17,13 +21,24 @@ def parse_results(response_text, original_title, original_author):
         match['search_author'] = original_author
         match['search_title'] = original_title
 
-        match['author'] = book.find("span", class_="creator").text.strip()
-        match['title'] = book.find("span", class_="title").text.strip()
-        match['link'] = book.find("a", class_="distinctparts")["href"]
-        additional_info_str = "|".join([additional.text.strip() for additional in book.find_all("p", class_="additional")])
-        match['additional_info'] = [info.strip() for info in additional_info_str.split("|")]
-        match['is_audiobook'] = 'Luisterboek' in match['additional_info']
-        match['is_ebook'] = 'E-book' in match['additional_info']
+        # parse minimum required information
+        try:
+                match['author'] = cleanup_whitespace(book.find("span", class_="creator").text)
+                match['title'] = cleanup_whitespace(book.find("span", class_="title").text)
+                match['link'] = book.find("a", class_="distinctparts")["href"]
+        except Exception as e:
+            print(f"Error parsing basic book info.")
+            continue
+
+        # parse additional metadata in book widget
+        try:
+            additional_info_str = "|".join([additional.text.strip() for additional in book.find_all("p", class_="additional")])
+            match['additional_info'] = [info.strip() for info in additional_info_str.split("|")]
+            match['is_audiobook'] = 'Luisterboek' in match['additional_info']
+            match['is_ebook'] = 'E-book' in match['additional_info']
+        except Exception as e:
+            print(f"Error parsing additional info for {match['author']} - {match['title']}")
+            print(e)
 
         # Fuzzy match author
         match['author_similarity'] = fuzz.partial_ratio(original_author.lower(), match['author'].lower())
@@ -40,8 +55,7 @@ def check_availability(title, author, work_type='ebook'):
 
     print(f"Checking availability of {title} by {author}")
 
-    formatted_title = title.replace(" ", "%20")
-    #formatted_title = f"{title} {author}".replace(" ", "%20")
+    formatted_title = urllib_quote(title) # escape characters such as ' '
 
     url = {
         'ebook': f"https://www.onlinebibliotheek.nl/zoekresultaten.catalogus.html?q={formatted_title}&leesvorm=ereader",
@@ -55,6 +69,7 @@ def check_availability(title, author, work_type='ebook'):
     except Exception as e:
         print(f"Error checking {author} - {title}: {e}")
         print(e)
+        print(type(e))
         return []
 
 def load_goodreads_data(goodreads_library_export='goodreads_library_export.csv', filter_shelf='to-read', ignore_shelves=None, filter_all=False):
