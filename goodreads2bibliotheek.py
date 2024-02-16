@@ -67,7 +67,7 @@ def load_goodreads_data(goodreads_library_export='goodreads_library_export.csv',
 
     return df, df_filtered
 
-def run(goodreads_library_export, max_books=None):
+def run(goodreads_library_export, work_type='ebook', max_books=None):
     # load, clean and filter data
     df, df_filtered = load_goodreads_data(goodreads_library_export)
 
@@ -76,11 +76,8 @@ def run(goodreads_library_export, max_books=None):
         df_filtered = df_filtered.iloc[:max_books]
 
     # scrape results
-    results = df_filtered.apply(lambda row: check_availability(row['title_clean'], row['Author']), axis=1)
+    results = df_filtered.apply(lambda row: check_availability(title=row['title_clean'], author=row['Author'], work_type=work_type), axis=1)
     return results
 
 
-    # TODO: script now assumes that Goodreads titles are in English and returns
-    # "English" for fully matching title, but some Goodreads titles are in Dutch.
-    # TODO: script errors on search with many hits ("Heen" by Laurens Verhagen)
-    # TODO: script does not yet distinguish e-books and audiobooks
+# TODO: script errors on search with many hits ("Heen" by Laurens Verhagen)
