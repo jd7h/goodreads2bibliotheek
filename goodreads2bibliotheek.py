@@ -23,7 +23,7 @@ def parse_results(response_text, original_title, original_author):
         # Fuzzy match author
         match['author_similarity'] = fuzz.partial_ratio(original_author.lower(), match['author'].lower())
         match['title_similarity'] = fuzz.partial_ratio(original_title.lower(), match['title'].lower())
-        if match['author_similarity'] < THRESHOLD and match['title_similarity'] < THRESHOLD:
+        if match['author_similarity'] < SIM_THRESHOLD and match['title_similarity'] < SIM_THRESHOLD:
             continue
         matches.append(match)
 
