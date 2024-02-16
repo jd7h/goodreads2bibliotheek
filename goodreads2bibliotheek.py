@@ -3,7 +3,7 @@ from fuzzywuzzy import fuzz
 import pandas as pd
 import requests
 
-SIM_THRESHOLD = 40
+SIM_THRESHOLD = 75
 
 def parse_results(response_text, original_title, original_author):
     soup = BeautifulSoup(response_text, "html.parser")
@@ -12,6 +12,9 @@ def parse_results(response_text, original_title, original_author):
     books = soup.find_all("div", class_="content list-big")
     for book in books:
         match = {}
+        match['search_author'] = original_author
+        match['search_title'] = original_title
+
         match['author'] = book.find("span", class_="creator").text.strip()
         match['title'] = book.find("span", class_="title").text.strip()
         match['link'] = book.find("a", class_="distinctparts")["href"]
@@ -23,7 +26,7 @@ def parse_results(response_text, original_title, original_author):
         # Fuzzy match author
         match['author_similarity'] = fuzz.partial_ratio(original_author.lower(), match['author'].lower())
         match['title_similarity'] = fuzz.partial_ratio(original_title.lower(), match['title'].lower())
-        if match['author_similarity'] < SIM_THRESHOLD and match['title_similarity'] < SIM_THRESHOLD:
+        if match['author_similarity'] < SIM_THRESHOLD:
             continue
         matches.append(match)
 
@@ -32,6 +35,8 @@ def parse_results(response_text, original_title, original_author):
 def check_availability(title, author, work_type='ebook'):
     if work_type not in ['ebook','audiobook']:
         raise ValueError("work_type must be 'ebook' or 'audiobook'")
+
+    print(f"Checking availability of {title} by {author}")
 
     formatted_title = title.replace(" ", "%20")
     #formatted_title = f"{title} {author}".replace(" ", "%20")
@@ -46,7 +51,9 @@ def check_availability(title, author, work_type='ebook'):
         results = parse_results(response.text, title, author)
         return results
     except Exception as e:
-        return f"Error checking {author} - {title}: {e}"
+        print(f"Error checking {author} - {title}: {e}")
+        print(e)
+        return []
 
 def load_goodreads_data(goodreads_library_export='goodreads_library_export.csv', filter_shelf='to-read', ignore_shelves=None, filter_all=False):
     df = pd.read_csv(goodreads_library_export)
