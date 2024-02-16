@@ -1,77 +1,86 @@
-from fuzzywuzzy import fuzz
 from bs4 import BeautifulSoup
+from fuzzywuzzy import fuzz
 import pandas as pd
 import requests
 
-# Load and prep Goodreads export CSV
-df = pd.read_csv("goodreads_library_export.csv")
-df_filtered = df[
-    df["Bookshelves"].str.contains("to-read", case=False, na=False)
-    & ~df["Bookshelves"].str.contains("acquired", case=False, na=False)
-    & ~df["Bookshelves"].str.contains("on-ereader", case=False, na=False)
-]
-df_filtered["Title"] = df_filtered["Title"].str.split(":").str[0]
-df_filtered["Title"] = df_filtered["Title"].apply(
-    lambda x: pd.Series(x).replace(r"\[.*?\]|\(.*?\)", "", regex=True)[0]
-)
-df_filtered["Title"] = df_filtered["Title"].str.strip()
-
+SIM_THRESHOLD = 40
 
 def parse_results(response_text, original_title, original_author):
     soup = BeautifulSoup(response_text, "html.parser")
 
-    matches = {"English": [], "Dutch": []}  # Store matches here
-
+    matches = []
     books = soup.find_all("div", class_="content list-big")
     for book in books:
-        author = book.find("span", class_="creator").text.strip()
-        title = book.find("span", class_="title").text.strip()
-        link = book.find("a", class_="distinctparts")["href"]
+        match = {}
+        match['author'] = book.find("span", class_="creator").text.strip()
+        match['title'] = book.find("span", class_="title").text.strip()
+        match['link'] = book.find("a", class_="distinctparts")["href"]
+        additional_info_str = "|".join([additional.text.strip() for additional in book.find_all("p", class_="additional")])
+        match['additional_info'] = [info.strip() for info in additional_info_str.split("|")]
+        match['is_audiobook'] = 'Luisterboek' in match['additional_info']
+        match['is_ebook'] = 'E-book' in match['additional_info']
 
         # Fuzzy match author
-        author_similarity = fuzz.partial_ratio(original_author.lower(), author.lower())
+        match['author_similarity'] = fuzz.partial_ratio(original_author.lower(), match['author'].lower())
+        match['title_similarity'] = fuzz.partial_ratio(original_title.lower(), match['title'].lower())
+        if match['author_similarity'] < THRESHOLD and match['title_similarity'] < THRESHOLD:
+            continue
+        matches.append(match)
 
-        if author_similarity > 75:  # Adjust threshold as necessary
-            title_similarity = fuzz.partial_ratio(original_title.lower(), title.lower())
+    return matches
 
-            # Determine if it's English or Dutch based on title similarity
-            language = "Dutch" if title_similarity <= 75 else "English"
-            matches[language].append(link)
+def check_availability(title, author, work_type='ebook'):
+    if work_type not in ['ebook','audiobook']:
+        raise ValueError("work_type must be 'ebook' or 'audiobook'")
 
-    # Prepare the return statement to include all relevant matches
-    result_lines = []
-    if matches["English"] or matches["Dutch"]:
-        if matches["English"]:
-            for link in matches["English"]:
-                result_lines.append(f"English: {link}")
-        if matches["Dutch"]:
-            for link in matches["Dutch"]:
-                result_lines.append(f"Dutch: {link}")
-    else:
-        result_lines.append("No results found")
-
-    return result_lines
-
-
-def check_availability(title, author):
     formatted_title = title.replace(" ", "%20")
-    url = f"https://www.onlinebibliotheek.nl/zoekresultaten.catalogus.html?q={formatted_title}"
+    #formatted_title = f"{title} {author}".replace(" ", "%20")
+
+    url = {
+        'ebook': f"https://www.onlinebibliotheek.nl/zoekresultaten.catalogus.html?q={formatted_title}&leesvorm=ereader",
+        'audiobook': f"https://www.onlinebibliotheek.nl/zoekresultaten.catalogus.html?q={formatted_title}&type=Digitaal_luisterboek"
+    }
 
     try:
-        response = requests.get(url)
+        response = requests.get(url[work_type])
         results = parse_results(response.text, title, author)
-        formatted_results = "\n".join(results)
-        return f"{title} - {author}:\n{formatted_results}"
+        return results
     except Exception as e:
         return f"Error checking {author} - {title}: {e}"
 
+def load_goodreads_data(goodreads_library_export='goodreads_library_export.csv', filter_shelf='to-read', ignore_shelves=None, filter_all=False):
+    df = pd.read_csv(goodreads_library_export)
 
-# Example loop to check availability (make sure to adjust for your actual data and environment)
-for index, row in df_filtered.iterrows():
-    print(check_availability(row["Title"], row["Author"]))
-print("Done.")
+    # clean first
+    df = df.assign(title_clean=lambda df: df['Title'].str.split(":").str[0].apply(
+        lambda x: pd.Series(x).replace(r"\[.*?\]|\(.*?\)", "", regex=True)[0]
+    ).str.strip())
 
-# TODO: script now assumes that Goodreads titles are in English and returns
-# "English" for fully matching title, but some Goodreads titles are in Dutch.
-# TODO: script errors on search with many hits ("Heen" by Laurens Verhagen)
-# TODO: script does not yet distinguish e-books and audiobooks
+    # then filter
+    df_filtered = df.loc[lambda df: df['Exclusive Shelf'] == filter_shelf]
+    if filter_all:
+        df_filtered = df.loc[lambda df: df['Bookshelves'] == filter_shelf]
+
+    if ignore_shelves:
+        for shelfname in ignore_shelves:
+            df_filtered = df_filtered.loc[lambda df: ~df['Bookshelves'].str.contains(shelfname, case=False, na=False)]
+
+    return df, df_filtered
+
+def run(goodreads_library_export, max_books=None):
+    # load, clean and filter data
+    df, df_filtered = load_goodreads_data(goodreads_library_export)
+
+    # max books to check
+    if max_books:
+        df_filtered = df_filtered.iloc[:max_books]
+
+    # scrape results
+    results = df_filtered.apply(lambda row: check_availability(row['title_clean'], row['Author']), axis=1)
+    return results
+
+
+    # TODO: script now assumes that Goodreads titles are in English and returns
+    # "English" for fully matching title, but some Goodreads titles are in Dutch.
+    # TODO: script errors on search with many hits ("Heen" by Laurens Verhagen)
+    # TODO: script does not yet distinguish e-books and audiobooks
