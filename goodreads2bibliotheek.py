@@ -85,7 +85,7 @@ def print_results(run_results):
         # alternative:
         # pprint.pprint(row, sort_dicts=False)
 
-def run(goodreads_library_export, work_type='ebook', max_books=None):
+def run(goodreads_library_export='goodreads_library_export.csv', work_type='ebook', max_books=None):
     # load, clean and filter data
     df, df_filtered = load_goodreads_data(goodreads_library_export)
 
