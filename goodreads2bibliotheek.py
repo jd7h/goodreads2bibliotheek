@@ -81,7 +81,7 @@ def print_results(run_results):
         print(f"{row['title']} - {row['author']}")
         print(row['link'])
         print()
-        
+
         # alternative:
         # pprint.pprint(row, sort_dicts=False)
 
@@ -97,7 +97,11 @@ def run(goodreads_library_export, work_type='ebook', max_books=None):
     results = df_filtered.apply(lambda row: check_availability(title=row['title_clean'], author=row['Author'], work_type=work_type), axis=1)
 
     # turn results into neat DataFrame
-    return pd.DataFrame([r for bookresult in results.to_list() for r in bookresult])
+    df_results = pd.DataFrame([r for bookresult in results.to_list() for r in bookresult])
+
+    print_results(df_results)
+
+    return df_results
 
 
 
