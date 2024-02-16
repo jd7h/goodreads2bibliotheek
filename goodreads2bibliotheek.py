@@ -91,14 +91,19 @@ def load_goodreads_data(goodreads_library_export='goodreads_library_export.csv',
 
     return df, df_filtered
 
-def print_results(run_results):
+def format_results(run_results):
+    s = ''
     for row in run_results.to_dict(orient='records'):
-        print(f"{row['title']} - {row['author']}")
-        print(row['link'])
-        print()
+        s += f"{row['title']} - {row['author']}\n"
+        s += f"row['link']\n"
+        s += "\n"
+    return s
 
-        # alternative:
-        # pprint.pprint(row, sort_dicts=False)
+def print_results(run_results):
+    print(format_results(run_results))
+
+    # alternative:
+    # pprint.pprint(row, sort_dicts=False)
 
 def run(goodreads_library_export='goodreads_library_export.csv', work_type='ebook', max_books=None):
     # load, clean and filter data
@@ -115,6 +120,10 @@ def run(goodreads_library_export='goodreads_library_export.csv', work_type='eboo
     df_results = pd.DataFrame([r for bookresult in results.to_list() for r in bookresult])
 
     print_results(df_results)
+
+    # write formatted results to file
+    with open("wishlist_online_bibliotheek.txt", 'w') as outfile:
+        outfile.write(format_results(df_results))
 
     return df_results
 
