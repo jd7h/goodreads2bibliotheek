@@ -122,7 +122,7 @@ def run(goodreads_library_export='goodreads_library_export.csv', work_type='eboo
     print_results(df_results)
 
     # write formatted results to file
-    with open("wishlist_online_bibliotheek.txt", 'w') as outfile:
+    with open(f"wishlist_online_bibliotheek_{work_type}.txt", 'w') as outfile:
         outfile.write(format_results(df_results))
 
     return df_results
