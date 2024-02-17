@@ -1,11 +1,11 @@
-from goodreads2bibliotheek import load_goodreads_data, SIM_THRESHOLD, fuzz, urllib_quote
-
 import datetime
 import pprint
 import json
 
 import requests
 import pandas as pd
+
+from goodreads2bibliotheek import load_goodreads_data, SIM_THRESHOLD, fuzz, urllib_quote
 
 def get_book_data(title, author):
     #escaped_title = urllib_quote(title)
@@ -106,6 +106,11 @@ def parse_book_data(data, original_title, original_author, branch_name):
         detail_data = get_detailed_info(match['book_id'])
         detailed_info = parse_detailed_info(detail_data)
         match.update(detailed_info)
+        
+        # filter on Dutch or English books
+        if match['lang'] not in ['Nederlands','Engels']:
+            print(f"Book {match['title']} not Dutch or English: {match['lang']}. Skipping...")
+            continue
 
         matches.append(match)
 
@@ -211,6 +216,8 @@ def parse_detailed_info(detailed_info_data):
             for aanschafinfo in detailed_info_data.get('fields').get('aanschafinfo').get('content'):
                 aanschaf_str += aanschafinfo.get('value')
         detailed_info['aanschafinfo'] = aanschaf_str
+        if detailed_info_data.get('fields').get('taal'):
+            detailed_info['lang'] = detailed_info_data.get('fields').get('taal').get('content')[0].get('value')
     except Exception as e:
         print("Parsing error: ", e)
         pprint.pprint(detailed_info_data)
