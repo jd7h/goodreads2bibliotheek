@@ -79,6 +79,9 @@ def load_goodreads_data(goodreads_library_export='goodreads_library_export.csv',
     df = df.assign(title_clean=lambda df: df['Title'].str.split(":").str[0].apply(
         lambda x: pd.Series(x).replace(r"\[.*?\]|\(.*?\)", "", regex=True)[0]
     ).str.strip())
+    
+    # sort by latest added books first
+    df = df.sort_values("Date Added", reverse=True)
 
     # then filter
     df_filtered = df.loc[lambda df: df['Exclusive Shelf'] == filter_shelf]
