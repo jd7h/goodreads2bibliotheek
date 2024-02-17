@@ -224,7 +224,7 @@ def parse_detailed_info(detailed_info_data):
     return detailed_info
         
 
-def check_catalogue(title, author, branch_name):
+def check_catalogue(title, author, branch_name="Mariënburg"):
     print(f"Checking availability of {title} by {author}")
 
     book_data = get_book_data(title=title, author=author)
